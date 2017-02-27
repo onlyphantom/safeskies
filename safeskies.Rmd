@@ -1,0 +1,145 @@
+---
+title: "R Notebook"
+output: html_notebook
+author: "Samuel Chan"
+date: "26/02/2017"
+---
+
+# Background
+This is an attempt to reproduce the Economist graph found on the article [Safe Skies](http://www.economist.com/blogs/graphicdetail/2014/03/daily-chart-6). The article came in light of the MH370 incident, and argued that despite the recent tragedy, air flights are getting safer. 
+
+```{r}
+# Some default set-up and library
+options(width=70)
+library(pipeR)
+```
+
+# Data Processing
+```{r}
+# Read in the data
+aviation <- read.csv("aviation.csv", header=T)
+
+# Notice the dataframe is sorted by the descending order on year. Let's correct that.
+aviation <- aviation[order(aviation$Year),]
+
+# Take only the casualties columns
+avi.cas <- aviation[, c(1,3,5,7)]
+
+# Change casualties number to billions
+aviation$passengers.b <- aviation$Worldwide.passengers.carried / 1000000
+```
+
+Melt the data into long-form:
+```{r}
+library(reshape2)
+avi.long <- melt(avi.cas, id.vars = "Year")
+avi.long$variable <- factor(avi.long$variable, levels = c("Bombing.Casualties", "Hijacking.Casualties", "Fatal.Airliner.Casualties"))
+```
+
+The optional showtext package for working with OTF fonts
+```{r}
+library(showtext)
+font.add("ITC Officina Book", "itc-officina-sans-std-book-58abde7814311.otf")
+font.add("ITC Officina Book Italic", "itc-officina-sans-std-book-italic-58abdf2354251.otf")
+font.add("ITC Officina Bold","itc-officina-sans-std-bold-58abdee9ae14e.otf")
+font.add("ITC Officina Bold Italic", "itc-officina-sans-std-bold-italic-58abdeff1b0ec.otf")
+showtext.auto()
+```
+
+# Creating our safeskies theme
+We create our safeskies theme based on theme_bw() 
+```{r}
+# Create our safeskies theme
+theme_safeskies <- theme_bw()+
+  theme(
+    aspect.ratio = 3/7,
+    legend.text = element_text(size=9, family = "ITC Officina Bold Italic", color="#934f3f"),
+    legend.title = element_text(size=9, family="ITC Officina Bold Italic", color="#934f3f"),
+    legend.position = c(-0.08,1),
+    legend.justification = "left",
+    legend.direction = "horizontal",
+    legend.spacing = unit(c(0,0,5,-5), "line"),
+    legend.key.height = unit(0.3, "cm"),
+    legend.margin = margin(b=4, l=15, t=-1),
+    plot.margin = unit(c(0, 0, 2, 0), units="line"),
+    axis.title.y=element_blank(),
+    axis.title.x=element_blank(),
+    axis.text.y = element_text(color="#934f3f", family="ITC Officina Bold", size=8),
+    axis.text.y.right = element_text(color="#00a1ce"),
+    plot.title = element_text(size=14, hjust=-0.06, vjust=5, margin=margin(b=-4), family="ITC Officina Bold"),
+    plot.subtitle = element_text(size=9, hjust=-0.05, vjust=6, margin=margin(b=15, t=-4), family="ITC Officina Book"),
+    panel.border = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_line(size=.1, color="grey66"),
+    panel.grid.minor.y = element_blank()
+  )
+
+```
+
+We first create the underlying barchart
+```{r}
+p <- subset(avi.long, Year < 2016 ) %>>% ggplot() +
+  geom_bar(stat="identity", position = "stack", aes(x = Year, y = value, fill = variable), width = 0.7) +
+  scale_fill_manual(values=c("red","orange","black"), guide = guide_legend(title="Casualties* due to:"), labels=c("Bombing.Casualties" = "bombing", "Hijacking.Casualties" = "hijacking", "Fatal.Airliner.Casualties" = "accident")) +
+  scale_x_continuous(breaks=seq(1970,2016, by=4))
+p
+```
+
+Create the glob that would be used in our final plot
+```{r}
+# library(grid)
+grob = grobTree(textGrob("Aircraft passengers carried, bn", x=0.72, y=0.96, hjust=0, vjust=-0.35, gp=gpar(fontsize=9, fontfamily="ITC Officina Bold Italic", col="#1aaad3")))
+```
+
+We write a function that returns our input "x" with 1 decimal place
+```{r}
+#Our digit transformation function
+scaleFUN <- function(x) sprintf("%.1f", x)
+```
+
+Add the secondary y-axis, our line plot, our glob and the safeskies theme that we've created:
+```{r}
+p <- p + scale_y_continuous(
+    "Casualties* due to:",
+    sec.axis = sec_axis(~. *0.001, 
+                        name="Aircraft passengers carried, bn", 
+                        labels = scaleFUN, 
+                        breaks = seq(0,3, by=0.5)),
+    limits = c(0,3000),
+    breaks = seq(0,3000, by=500),
+    labels = comma
+  ) +
+  geom_line(data = aviation, mapping = aes(x = Year, y = passengers.b * 1000), stat = "identity", position = "identity", na.rm =TRUE, color="#00a1ce", size=1.5) +
+  labs(title = "Aircraft safety", subtitle="Worldwide") +
+  annotation_custom(grob) +
+  theme_safeskies
+p
+```
+
+
+To make it resemble the one on [this Economist graph](http://www.economist.com/blogs/graphicdetail/2014/03/daily-chart-6),
+we can reorder the factor levels and change the scale_fill_manual values:
+```{r}
+
+subset(avi.long, Year < 2016 ) %>>% ggplot() +
+  geom_bar(stat="identity", position = "stack", aes(x = Year, y = value, fill = variable), width = 0.7) +
+  scale_fill_manual(values=c("#ef4623","#772210","#eea083"), guide = guide_legend(title="Casualties* due to:"), labels=c( "Fatal.Airliner.Casualties" = "accident", "Hijacking.Casualties" = "hijacking","Bombing.Casualties" = "bombing")) +
+  scale_x_continuous(breaks=seq(1970,2016, by=4)) +
+  scale_y_continuous(
+    "Casualties* due to:",
+    sec.axis = sec_axis(~. *0.001, 
+                        name="Aircraft passengers carried, bn", 
+                        labels = scaleFUN, 
+                        breaks = seq(0,3, by=0.5)),
+    limits = c(0,3000),
+    breaks = seq(0,3000, by=500),
+    labels = comma
+  ) +
+  geom_line(data = aviation, mapping = aes(x = Year, y = passengers.b * 1000), stat = "identity", position = "identity", na.rm =TRUE, color="#00a1ce", size=1.5) +
+  labs(title = "Aircraft safety", subtitle="Worldwide") +
+  annotation_custom(grob) +
+  theme_safeskies
+```
+
+
