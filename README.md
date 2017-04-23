@@ -1,7 +1,10 @@
 # Recreating an Economist graph from scratch using ggplot
 This is a weekend exercise. Our objective is to reproduce an Economist graph found on the article: [Safe Skies](http://www.economist.com/blogs/graphicdetail/2014/03/daily-chart-6). The Economist article came in light of the MH370 incident, and argued that despite the recent tragedy, air flights are getting safer. 
 
-# Challenge
+
+![](safeskies.png)
+
+# The Challenge
 Because we are reproducing a graph from scratch, this project involves the collection of data from the original sources. However, since the primary objective of this exercise is concerned with the use of ggplot2 and the various techniques in generating an Economist-like graph, I have compiled the data into a dataset, `aviation.csv`, which is included in the repo. Our approach in recreating the Economist graph will be as follow:
 
 1. Read and process the dataset 
